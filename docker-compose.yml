@@ -1,0 +1,131 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-answerforge}
+      POSTGRES_USER: ${POSTGRES_USER:-answerforge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-answerforge-local}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [answerforge]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    networks: [answerforge]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  api:
+    build: { context: ./backend, dockerfile: Dockerfile }
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+      - path: backend/.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-answerforge}:${POSTGRES_PASSWORD:-answerforge-local}@db:5432/${POSTGRES_DB:-answerforge}
+      REDIS_URL: redis://redis:6379/0
+      STORAGE_PATH: /app/storage
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:3000,http://127.0.0.1:3000}
+    expose: ["8000"]
+    volumes: ["upload_data:/app/storage"]
+    networks: [answerforge]
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  worker:
+    build: { context: ./backend, dockerfile: Dockerfile }
+    restart: unless-stopped
+    command: ["rq", "worker", "--with-scheduler", "--worker-class", "rq.worker.SimpleWorker", "answerforge-agent"]
+    env_file:
+      - path: .env
+        required: false
+      - path: backend/.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-answerforge}:${POSTGRES_PASSWORD:-answerforge-local}@db:5432/${POSTGRES_DB:-answerforge}
+      REDIS_URL: redis://redis:6379/0
+      STORAGE_PATH: /app/storage
+    volumes: ["upload_data:/app/storage"]
+    networks: [answerforge]
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  ingestion-worker:
+    build: { context: ./backend, dockerfile: Dockerfile }
+    restart: unless-stopped
+    command: ["rq", "worker", "--with-scheduler", "--worker-class", "rq.worker.SimpleWorker", "answerforge-ingestion"]
+    env_file:
+      - path: .env
+        required: false
+      - path: backend/.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-answerforge}:${POSTGRES_PASSWORD:-answerforge-local}@db:5432/${POSTGRES_DB:-answerforge}
+      REDIS_URL: redis://redis:6379/0
+      STORAGE_PATH: /app/storage
+    volumes: ["upload_data:/app/storage"]
+    networks: [answerforge]
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-/api}"
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
+      INTERNAL_API_BASE_URL: http://api:8000
+    expose: ["3000"]
+    networks: [answerforge]
+    depends_on:
+      api: { condition: service_healthy }
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80"]
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [answerforge]
+    depends_on:
+      api: { condition: service_healthy }
+      frontend: { condition: service_started }
+
+networks:
+  answerforge:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  upload_data:
+  caddy_data:
+  caddy_config:

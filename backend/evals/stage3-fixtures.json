@@ -1,0 +1,16 @@
+[
+  {
+    "id": "strong-security-encryption",
+    "question": "How is customer data encrypted?",
+    "expected_evidence_status": "STRONG",
+    "expected_source_ids": ["security-architecture:14"],
+    "expect_abstention": false
+  },
+  {
+    "id": "missing-unsupported-region",
+    "question": "Is the product available in every country?",
+    "expected_evidence_status": "MISSING",
+    "expected_source_ids": [],
+    "expect_abstention": true
+  }
+]

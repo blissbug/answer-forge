@@ -1,0 +1,14 @@
+# Local HTTP ingress. Replace this address with a real domain (without the
+# http:// scheme) later and Caddy will provision HTTPS automatically.
+http://localhost {
+    # FastAPI routes have no /api prefix, so handle_path strips it.
+    handle_path /api/* {
+        reverse_proxy api:8000 {
+            flush_interval -1
+        }
+    }
+
+    handle {
+        reverse_proxy frontend:3000
+    }
+}

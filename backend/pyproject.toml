@@ -1,0 +1,36 @@
+[project]
+name = "answerforge-api"
+version = "0.1.0"
+description = "AnswerForge Stage 1 Knowledge Base API"
+requires-python = ">=3.11"
+dependencies = [
+  "alembic>=1.14",
+  "fastapi>=0.115",
+  "google-genai>=1.0",
+  "openpyxl>=3.1",
+  "opentelemetry-api>=1.30",
+  "opentelemetry-exporter-otlp-proto-http>=1.30",
+  "opentelemetry-instrumentation-fastapi>=0.51b0",
+  "opentelemetry-instrumentation-redis>=0.51b0",
+  "opentelemetry-instrumentation-sqlalchemy>=0.51b0",
+  "opentelemetry-sdk>=1.30",
+  "pgvector>=0.3",
+  "psycopg[binary]>=3.2",
+  "pydantic-settings>=2.7",
+  "redis>=5.2",
+  "rq>=2.0",
+  "pypdf>=5.1",
+  "python-multipart>=0.0.20",
+  "sqlalchemy>=2.0",
+  "uvicorn[standard]>=0.34",
+]
+
+[project.optional-dependencies]
+dev = ["httpx>=0.28", "pytest>=8.3", "pytest-asyncio>=0.25"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+exclude = ["alembic*", "tests*"]
